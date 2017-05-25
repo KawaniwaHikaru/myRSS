@@ -120,8 +120,6 @@ func Crawl(strUrl string, srcCh chan string, chFinished chan bool) {
             link = mainDoc.Scheme + ":" + link
         }
 
-        fmt.Println(href.Host, mainDoc.Host)
-
         if href.Host == mainDoc.Host {
             srcCh <- link
         }
@@ -129,10 +127,12 @@ func Crawl(strUrl string, srcCh chan string, chFinished chan bool) {
     })
 }
 
-func parsePage(strUrl string) (links map[string]int) {
 
-    // gonna return this thing
-    links = make(map[string]int)
+/**
+ Unnecessary complex for parsing one page.
+ might as well support multiple init URL
+ */
+func parsePage(strUrl string) (links map[string]int) {
 
     // Channels
     chLinks := make(chan string)
@@ -142,7 +142,11 @@ func parsePage(strUrl string) (links map[string]int) {
     if !strings.HasPrefix(strUrl, "http") {
         strUrl = "http://" + strUrl
     }
-    //
+
+    // probably want to rewrite this
+    // we are only parsing one page
+    // should do the hash link collection inside
+    // the Crawl
     go Crawl(strUrl, chLinks, chFinished)
 
     var isFinished bool
@@ -168,21 +172,24 @@ func main() {
         log.Fatalln("ERROR : Less Args\nCommand should be of type : " + path.Base(os.Args[0]) + " [folder to save] [websites]\n\n")
     }
 
-    // use a hash-map to hold the found links
     seedUrls := os.Args[1:]
 
+    // use a hash-map to hold the found links
     links := parsePage(seedUrls[0])
 
+    // spawn Go Routines for all hash maps
+    // should do some kind of throttling
     wg.Add(len(links))
-
-    for key, _ := range links {
+    for key := range links {
+        // run the parser and call wg.Done
+        // use Anonymous function to avoid passing the
+        // wg into the function
         go func() {
-            parseShinto(key)
             //fmt.Println(key)
+            parseShinto(key)
             wg.Done()
         }()
     }
 
     wg.Wait()
-    //images.DownloadImages()
 }
