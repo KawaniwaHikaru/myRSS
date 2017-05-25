@@ -40,6 +40,7 @@ func parseMetalSucks() {
 }
 
 func parseShinto(urlObj url.URL) {
+
     type NewsContent struct {
         Url     string
         Title   string
@@ -83,6 +84,10 @@ func parseShinto(urlObj url.URL) {
 
     p.Scan()
 }
+
+// matching for specific path
+// eg. /1165158/2017-05-24/post-土改三年 逾百萬地主亡/
+var r = regexp.MustCompile(`/(\d*)/(\d{4}-\d{2}-\d{2})/(.*)`)
 
 func parsePage(srcURL string) (links map[string]url.URL) {
 
@@ -128,9 +133,6 @@ func parsePage(srcURL string) (links map[string]url.URL) {
             return
         }
 
-        // matching for specific path
-        // eg. /1165158/2017-05-24/post-土改三年 逾百萬地主亡/
-        r := regexp.MustCompile(`/(\d*)/(\d{4}-\d{2}-\d{2})/(.*)`)
         if !r.MatchString(href.Path) {
             return
         }
