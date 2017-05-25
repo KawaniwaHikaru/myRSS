@@ -6,6 +6,11 @@ import (
     "fmt"
     "time"
     "strings"
+    "os"
+    "log"
+    "net/url"
+    "path"
+    "sync"
 )
 
 func parseMetalSucks() {
@@ -33,12 +38,7 @@ func parseMetalSucks() {
     fmt.Println(songs)
 }
 
-func main() {
-    parseShinto("http://vancouver.singtao.ca/1165366/2017-05-24/post-%E4%B8%80%E4%BB%A3%E4%BF%A0%E5%A5%B3%E4%BA%8E%E7%B4%A0%E7%A7%8B%E9%95%B7%E7%9C%A0%E4%B8%89%E8%97%A9%E5%B8%82/?variant=zh-hk")
-}
-
 func parseShinto(strUrl string) {
-
     type NewsContent struct {
         Url     string
         Title   string
@@ -52,31 +52,137 @@ func parseShinto(strUrl string) {
         Middleware: func(i int, s *goquery.Selection) {
             // parse the Time
             timeStr := s.Find(".title_noline").Next().Text()
-            var ctime time.Time
+            var publishedTime time.Time
             var err error
 
             switch len(timeStr) {
             case 12:
-                ctime, err = time.Parse("[2006-01-02]", timeStr)
+                publishedTime, err = time.Parse("[2006-01-02]", timeStr)
             case 17:
-                ctime, err = time.Parse("[2006-01-02 15:04]", timeStr)
+                publishedTime, err = time.Parse("[2006-01-02 15:04]", timeStr)
             default:
-                ctime = time.Now()
+                publishedTime = time.Now()
             }
             if err != nil {
                 fmt.Println(err)
             }
 
+            content, _ := s.Find(".content").Html()
+
             // For each item found, get the band and title
             page := NewsContent{
                 Url: strUrl,
                 Title: strings.TrimSpace(s.Find(".title_noline").Text()),
-                Content: strings.TrimSpace(s.Find(".content").Text()),
-                Created: ctime,
+                Content: strings.TrimSpace(content),
+                Created: publishedTime,
             }
             fmt.Print(page)
         },
     }
 
     p.Scan()
+}
+
+func Crawl(strUrl string, srcCh chan string, chFinished chan bool) {
+
+    fmt.Println("Fetching Page..")
+    defer func() {
+        fmt.Println("Done Crawling...")
+        chFinished <- true
+    }()
+
+    // main document
+    mainDoc, err := url.Parse(strUrl)
+    if (err != nil) {
+        return
+    }
+
+    // get the Document
+    resp, err := goquery.NewDocument(strUrl)
+    if err != nil {
+        log.Fatalln(`ERROR: Failed to crawl `, strUrl)
+    }
+
+
+    // use CSS selector found with the browser inspector
+    // for each, use index and item
+    resp.Find("a").Each(func(index int, item *goquery.Selection) {
+        //link, _ := item.Find("img").Attr("src")
+        link, _ := item.Attr("href")
+        target, _ := item.Attr("target")
+        href, err := url.Parse(link)
+
+        if err != nil || link == "" || link == "#" || target != "_blank" {
+            return
+        }
+
+        if !strings.HasPrefix(link, "http") {
+            link = mainDoc.Scheme + ":" + link
+        }
+
+        fmt.Println(href.Host, mainDoc.Host)
+
+        if href.Host == mainDoc.Host {
+            srcCh <- link
+        }
+
+    })
+}
+
+func parsePage(strUrl string) (links map[string]int) {
+
+    // gonna return this thing
+    links = make(map[string]int)
+
+    // Channels
+    chLinks := make(chan string)
+    chFinished := make(chan bool)
+
+    // check if we start with http
+    if !strings.HasPrefix(strUrl, "http") {
+        strUrl = "http://" + strUrl
+    }
+    //
+    go Crawl(strUrl, chLinks, chFinished)
+
+    var isFinished bool
+
+    for !isFinished {
+        select {
+        case url := <-chLinks:
+            links[url]++
+
+        case isFinished = <-chFinished:
+
+        }
+    }
+
+    return
+}
+
+func main() {
+
+    var wg sync.WaitGroup
+
+    if len(os.Args) < 2 {
+        log.Fatalln("ERROR : Less Args\nCommand should be of type : " + path.Base(os.Args[0]) + " [folder to save] [websites]\n\n")
+    }
+
+    // use a hash-map to hold the found links
+    seedUrls := os.Args[1:]
+
+    links := parsePage(seedUrls[0])
+
+    wg.Add(len(links))
+
+    for key, _ := range links {
+        go func() {
+            parseShinto(key)
+            //fmt.Println(key)
+            wg.Done()
+        }()
+    }
+
+    wg.Wait()
+    //images.DownloadImages()
 }
