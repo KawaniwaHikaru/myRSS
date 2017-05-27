@@ -86,6 +86,7 @@ func parseShinto(urlObj url.URL) {
 				Content: strings.TrimSpace(content),
 				Created: publishedTime,
 			}
+			fmt.Println(page.Title)
 
 			_, err = stmt.Exec(page.Url, page.Title, page.Content, page.Created)
 			if mysqlError, ok := err.(*mysql.MySQLError); ok {
@@ -94,6 +95,7 @@ func parseShinto(urlObj url.URL) {
 					fmt.Println(mysqlError)
 				}
 			}
+			stmt.Close()
 
 		},
 	}
