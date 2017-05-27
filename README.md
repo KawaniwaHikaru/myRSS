@@ -14,3 +14,4 @@ parses and insert each article from the main page into a mysql table
 * a nicer frontend to display the articles or push it to an RSS feed
 * also download the media in the contents
 * add license information
+* make db writing in it's own queue so system doesn't open concurrent connection
