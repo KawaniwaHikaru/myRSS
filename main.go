@@ -49,12 +49,43 @@ type Article struct {
 	Created time.Time
 }
 
-func parseShinto(urlObj url.URL) {
+func ArticleDAO(pageCh chan Article, doneCh chan bool) {
+
+	defer db.Close()
+
+	var err error
+	db, err = sql.Open("mysql", "myrss@/myrss?charset=utf8")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	stmt, err := db.Prepare("INSERT articles SET url=?,title=?,content=?,created=?")
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	var isDone bool
+	for !isDone {
+		select {
+		case page := <-pageCh:
+			if _, err := stmt.Exec(page.Url, page.Title, page.Content, page.Created); err != nil {
+				if mysqlError, ok := err.(*mysql.MySQLError); ok {
+					if mysqlError.Number == 1062 {
+						//duplicate unique
+						fmt.Println(mysqlError)
+					}
+				}
+			} else {
+				fmt.Println(page.Title, page.Created)
+			}
+		case isDone = <-doneCh:
+		close(pageCh)
+		close(doneCh)
+		}
+	}
+}
+
+func parseShinto(urlObj url.URL) {
 
 	p := parseEx.ParseEx{
 		Url:    urlObj.String(),
@@ -86,17 +117,9 @@ func parseShinto(urlObj url.URL) {
 				Content: strings.TrimSpace(content),
 				Created: publishedTime,
 			}
-			fmt.Println(page.Title)
 
-			_, err = stmt.Exec(page.Url, page.Title, page.Content, page.Created)
-			if mysqlError, ok := err.(*mysql.MySQLError); ok {
-				if mysqlError.Number == 1062 {
-					//duplicate unique
-					fmt.Println(mysqlError)
-				}
-			}
-			stmt.Close()
-
+			// pass the new page to the article Channel
+			articleCh <- page
 		},
 	}
 
@@ -163,18 +186,17 @@ func parsePage(srcURL string) (links map[string]url.URL) {
 	return
 }
 
+var doneCh = make(chan bool)
+var articleCh = make(chan Article)
+
 func init() {
 
-	var err error
-	db, err = sql.Open("mysql", "myrss@/myrss?charset=utf8")
-	if err != nil {
-		log.Fatal(err)
-	}
+	// spawn the dao
+	go ArticleDAO(articleCh, doneCh)
 
 }
 
 func main() {
-	defer db.Close()
 	var wg sync.WaitGroup
 
 	if len(os.Args) < 2 {
@@ -200,4 +222,7 @@ func main() {
 	}
 
 	wg.Wait()
+
+	// tell DAO to exit
+	//doneCh <- true
 }

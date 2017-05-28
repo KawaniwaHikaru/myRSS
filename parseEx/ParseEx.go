@@ -11,7 +11,7 @@ type ParseEx struct {
     Middleware func(i int, s *goquery.Selection)
 }
 
-func (p *ParseEx)Scan() {
+func (p *ParseEx)Scan(){
 
     doc, err := goquery.NewDocument(p.Url)
     if err != nil {
