@@ -79,16 +79,16 @@ func ArticleDAO(pageCh chan Article, doneCh chan bool) {
 				fmt.Println(page.Title, page.Created)
 			}
 		case isDone = <-doneCh:
-		close(pageCh)
-		close(doneCh)
+			close(pageCh)
+			close(doneCh)
 		}
 	}
 }
 
-func parseShinto(urlObj url.URL) {
+func parseShinto(targetURL url.URL) {
 
 	p := parseEx.ParseEx{
-		Url:    urlObj.String(),
+		Url:    targetURL.String(),
 		Needle: "div#inner_content_ver2",
 		Middleware: func(i int, s *goquery.Selection) {
 			// parse the Time
@@ -112,7 +112,7 @@ func parseShinto(urlObj url.URL) {
 
 			// For each item found, get the band and title
 			page := Article{
-				Url:     urlObj.String(),
+				Url:     targetURL.String(),
 				Title:   strings.TrimSpace(s.Find(".title_noline").Text()),
 				Content: strings.TrimSpace(content),
 				Created: publishedTime,
@@ -164,7 +164,6 @@ func parsePage(srcURL string) (links map[string]url.URL) {
 			// can't parse this link, move to next
 			return
 		}
-
 		// fill in the schema with targetURL
 		if href.Scheme == "" {
 			href.Scheme = srcPageURL.Scheme
@@ -179,8 +178,16 @@ func parsePage(srcURL string) (links map[string]url.URL) {
 			return
 		}
 
+		// get the first //
+		fields := strings.Split(href.Path, "/")
+
+		newURL := href.Scheme + "://" + href.Host + "/" + fields[1] + "/"
+		newURL2, err := url.Parse(newURL)
+
+		//fmt.Println(newURL)
+
 		// all passed, now push it into the hashmap
-		links[href.Path] = *href
+		links[newURL] = *newURL2
 	})
 
 	return
