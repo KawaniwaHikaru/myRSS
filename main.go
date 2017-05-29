@@ -49,7 +49,7 @@ type Article struct {
 	Created time.Time
 }
 
-func ArticleDAO(pageCh chan Article, doneCh chan bool) {
+func ArticleDAO(pageCh chan Article) {
 
 	defer db.Close()
 
@@ -78,9 +78,6 @@ func ArticleDAO(pageCh chan Article, doneCh chan bool) {
 			} else {
 				fmt.Println(page.Title, page.Created)
 			}
-		case isDone = <-doneCh:
-			close(pageCh)
-			close(doneCh)
 		}
 	}
 }
@@ -190,13 +187,13 @@ func parsePage(srcURL string) (links map[string]url.URL) {
 	return
 }
 
-var doneCh = make(chan bool)
+//var doneCh = make(chan bool)
 var articleCh = make(chan Article)
 
 func init() {
 
 	// spawn the dao
-	go ArticleDAO(articleCh, doneCh)
+	go ArticleDAO(articleCh)
 
 }
 
@@ -207,10 +204,8 @@ func main() {
 		log.Fatalln("ERROR : Less Args\nCommand should be of type : " + path.Base(os.Args[0]) + " [folder to save] [websites]\n\n")
 	}
 
-	seedUrls := os.Args[1:]
-
 	// use a hash-map to hold the found links
-	links := parsePage(seedUrls[0])
+	links := parsePage(os.Args[1])
 
 	//fmt.Println(len(links))
 	wg.Add(len(links))
