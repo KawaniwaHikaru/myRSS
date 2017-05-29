@@ -72,7 +72,7 @@ func ArticleDAO(pageCh chan Article, doneCh chan bool) {
 				if mysqlError, ok := err.(*mysql.MySQLError); ok {
 					if mysqlError.Number == 1062 {
 						//duplicate unique
-						fmt.Println(mysqlError)
+						fmt.Println(`Duplicate Record`, page.Url)
 					}
 				}
 			} else {
@@ -180,14 +180,11 @@ func parsePage(srcURL string) (links map[string]url.URL) {
 
 		// get the first //
 		fields := strings.Split(href.Path, "/")
-
-		newURL := href.Scheme + "://" + href.Host + "/" + fields[1] + "/"
-		newURL2, err := url.Parse(newURL)
-
+		href.Path = fields[1] + "/"
+		//newURL, err := url.Parse(href.Scheme + "://" + href.Host + "/" + fields[1] + "/")
 		//fmt.Println(newURL)
 
-		// all passed, now push it into the hashmap
-		links[newURL] = *newURL2
+		links[href.String()] = *href
 	})
 
 	return
